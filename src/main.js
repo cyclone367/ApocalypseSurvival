@@ -151,20 +151,20 @@ function showSharePreview({ imageUrl, filename, file }) {
   const supportsShare = Boolean(file && navigator.share);
   const isWeChat = /MicroMessenger/i.test(navigator.userAgent || "");
   const instructions = isWeChat
-    ? "长按图片保存，或使用右上角分享"
-    : "长按图片保存到相册";
+    ? `<p class="share-preview-main-instruction">长按下方图片保存到手机</p><p class="share-preview-secondary-instruction">也可使用右上角 ··· 分享给朋友</p>`
+    : `<p class="share-preview-main-instruction">长按图片保存到相册</p>`;
   const modal = document.createElement("div");
   modal.className = "share-preview";
   modal.dataset.sharePreview = "true";
   modal.innerHTML = `<section class="share-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="share-preview-title">
     <header class="share-preview-header">
-      <div><h2 id="share-preview-title">结果卡片</h2><p>${instructions}</p><small>LONG PRESS TO SAVE</small></div>
+      <div><h2 id="share-preview-title">结果卡片</h2>${instructions}<small>LONG PRESS TO SAVE</small></div>
       <button class="share-preview-close" type="button" aria-label="关闭预览">×</button>
     </header>
     <div class="share-preview-content"><img src="${imageUrl}" alt="${currentShareData.endingTitle} · 生存结果分享卡片" /></div>
     <footer class="share-preview-actions">
       ${supportsShare ? `<button class="primary-button" type="button" data-preview-action="share">分享 <span>↗</span></button>` : ""}
-      <a class="secondary-button" href="${imageUrl}" download="${filename}" data-preview-action="download">下载图片 <span>↓</span></a>
+      ${isWeChat ? "" : `<a class="secondary-button" href="${imageUrl}" download="${filename}" data-preview-action="download">下载图片 <span>↓</span></a>`}
     </footer>
   </section>`;
   document.body.appendChild(modal);

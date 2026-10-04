@@ -408,3 +408,29 @@ body { background: #111412; }
   margin: 0;
   text-decoration: none;
 }
+.share-preview-header .share-preview-main-instruction { margin: 0; color: #e3e1d8; font-size: 14px; }
+.share-preview-header .share-preview-secondary-instruction { margin: 2px 0 0; color: #b0b2a5; font-size: 12px; }
+@media (max-width: 599px) {
+  .game-shell .game-topbar { padding: 1px 0 7px; gap: 2px 9px; }
+  .game-shell .feedback {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    flex: 0 0 auto;
+    gap: 3px;
+    margin: 4px auto 8px;
+    padding: 6px 10px;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .game-shell .feedback .feedback-text { font-size: 14px; line-height: 1.45; }
+  .game-shell .day-heading { margin: 3px 0 8px; }
+  .game-shell .day-heading .eyebrow { display: none; }
+  .game-shell .day-heading h1 { font-size: 30px; line-height: 1.2; }
+  .game-shell .story-card { padding: 10px 14px 11px; }
+  .game-shell .story-card .card-label { display: none; }
+  .game-shell .story-card p { margin: 0 0 6px; font-size: 18px; line-height: 1.5; }
+  .game-shell .story-card h2 { font-size: 20px; line-height: 1.45; }
+  .game-shell .option-list { gap: 6px; margin-top: 8px; }
+  .game-shell .option-button { padding-top: 8px; padding-bottom: 8px; }
+}
