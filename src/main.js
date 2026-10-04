@@ -118,7 +118,7 @@ function renderResult() {
     </div>
     <div class="system-note"><span class="note-icon">⌁</span><p><b>系统评价</b>${ending.evaluation}</p></div>
     <div class="result-actions">
-      <button class="primary-button" data-action="save">保存结果卡片 <span>↗</span></button>
+      <button class="primary-button" data-action="save">生成分享卡片 <span>↗</span></button>
       <button class="secondary-button" data-action="copy">复制结果 <span>⧉</span></button>
       <button class="secondary-button" data-action="restart">重新开始 <span>↻</span></button>
     </div>
@@ -128,6 +128,7 @@ function renderResult() {
 
 async function saveResultCard() {
   const hint = app.querySelector("#share-status");
+  let imageUrl;
   try {
     const canvas = createShareCardCanvas(currentShareData);
     const blob = await canvasToPngBlob(canvas);
@@ -135,34 +136,78 @@ async function saveResultCard() {
     const file = typeof File === "function"
       ? new File([blob], filename, { type: "image/png" })
       : null;
-
-    if (file && navigator.canShare?.({ files: [file] }) && navigator.share) {
-      try {
-        await navigator.share({ files: [file], title: currentShareData.endingTitle });
-        if (hint) hint.textContent = "结果卡片已分享";
-        return;
-      } catch (error) {
-        if (error.name === "AbortError") {
-          if (hint) hint.textContent = "已取消分享";
-          return;
-        }
-      }
-    }
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.hidden = true;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    if (hint) hint.textContent = "结果卡片 PNG 已生成，正在下载";
+    imageUrl = URL.createObjectURL(blob);
+    showSharePreview({ imageUrl, filename, file });
+    if (hint) hint.textContent = "分享卡片已生成";
   } catch (error) {
+    if (imageUrl) URL.revokeObjectURL(imageUrl);
     console.error("Could not generate or save the result card.", error);
     if (hint) hint.textContent = "卡片生成失败，请稍后重试";
   }
+}
+
+function showSharePreview({ imageUrl, filename, file }) {
+  closeSharePreview();
+  const supportsShare = Boolean(file && navigator.share);
+  const isWeChat = /MicroMessenger/i.test(navigator.userAgent || "");
+  const instructions = isWeChat
+    ? "长按图片保存，或使用右上角分享"
+    : "长按图片保存到相册";
+  const modal = document.createElement("div");
+  modal.className = "share-preview";
+  modal.dataset.sharePreview = "true";
+  modal.innerHTML = `<section class="share-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="share-preview-title">
+    <header class="share-preview-header">
+      <div><h2 id="share-preview-title">结果卡片</h2><p>${instructions}</p><small>LONG PRESS TO SAVE</small></div>
+      <button class="share-preview-close" type="button" aria-label="关闭预览">×</button>
+    </header>
+    <div class="share-preview-content"><img src="${imageUrl}" alt="${currentShareData.endingTitle} · 生存结果分享卡片" /></div>
+    <footer class="share-preview-actions">
+      ${supportsShare ? `<button class="primary-button" type="button" data-preview-action="share">分享 <span>↗</span></button>` : ""}
+      <a class="secondary-button" href="${imageUrl}" download="${filename}" data-preview-action="download">下载图片 <span>↓</span></a>
+    </footer>
+  </section>`;
+  document.body.appendChild(modal);
+  document.body.classList.add("share-preview-open");
+
+  const close = () => closeSharePreview();
+  modal.querySelector(".share-preview-close").addEventListener("click", close);
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) close();
+  });
+  modal.querySelector('[data-preview-action="share"]')?.addEventListener("click", async () => {
+    const status = app.querySelector("#share-status");
+    try {
+      await navigator.share({ files: [file], title: currentShareData.endingTitle });
+      if (status) status.textContent = "结果卡片已分享";
+    } catch (error) {
+      if (error.name === "AbortError") {
+        if (status) status.textContent = "已取消分享";
+      } else {
+        console.error("Could not share the result card.", error);
+        if (status) status.textContent = "暂时无法分享，请长按图片保存";
+      }
+    }
+  });
+  modal.querySelector('[data-preview-action="download"]')?.addEventListener("click", () => {
+    const status = app.querySelector("#share-status");
+    if (status) status.textContent = "正在下载结果卡片";
+  });
+  document.addEventListener("keydown", handleSharePreviewKeydown);
+}
+
+function handleSharePreviewKeydown(event) {
+  if (event.key === "Escape") closeSharePreview();
+}
+
+function closeSharePreview() {
+  const modal = document.querySelector("[data-share-preview]");
+  if (!modal) return;
+  const imageUrl = modal.querySelector("img")?.src;
+  modal.remove();
+  document.body.classList.remove("share-preview-open");
+  document.removeEventListener("keydown", handleSharePreviewKeydown);
+  if (imageUrl) URL.revokeObjectURL(imageUrl);
 }
 
 async function copyResult() {
