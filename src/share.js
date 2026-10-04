@@ -1,3 +1,5 @@
+import { GAME_URL } from "./share-config.js";
+
 const ATTRIBUTE_LABELS = {
   survival: "生存",
   social: "社交",
@@ -35,6 +37,7 @@ export function buildShareData(ending, scores, days) {
     endingCategory: category,
     survivalDays: days,
     totalDays: 15,
+    gameUrl: GAME_URL,
     attributes,
     evaluation
   };
@@ -47,7 +50,8 @@ export function formatShareText(data) {
 
 生存 ${attributes.survival.value}｜社交 ${attributes.social.value}｜理智 ${attributes.sanity.value}｜混乱 ${attributes.chaos.value}
 
-你能活几天？`;
+你能活几天？
+${data.gameUrl}`;
 }
 
 export async function copyText(text, {

@@ -1,5 +1,9 @@
+import QRCode from "qrcode";
+import { GAME_URL } from "./share-config.js";
+
 const WIDTH = 1080;
 const HEIGHT = 1440;
+const QR_SIZE = 228;
 const COLORS = {
   background: "#111412",
   panel: "#1b201b",
@@ -56,9 +60,41 @@ function drawRule(context, y, left = 88, right = WIDTH - 88) {
   context.stroke();
 }
 
+export function createQrCodeData(url = GAME_URL) {
+  if (typeof url !== "string" || !url) throw new TypeError("A game URL is required to create a QR code.");
+  return QRCode.create(url, { errorCorrectionLevel: "H" });
+}
+
+function drawQrCode(context, url, x, y) {
+  const qr = createQrCodeData(url);
+  const quietModules = 4;
+  const moduleSize = Math.floor(QR_SIZE / (qr.modules.size + quietModules * 2));
+  const totalSize = moduleSize * (qr.modules.size + quietModules * 2);
+  const originX = x + Math.floor((QR_SIZE - totalSize) / 2);
+  const originY = y + Math.floor((QR_SIZE - totalSize) / 2);
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(x, y, QR_SIZE, QR_SIZE);
+  context.fillStyle = "#000000";
+  for (let row = 0; row < qr.modules.size; row += 1) {
+    for (let column = 0; column < qr.modules.size; column += 1) {
+      if (qr.modules.get(row, column)) {
+        context.fillRect(
+          originX + (column + quietModules) * moduleSize,
+          originY + (row + quietModules) * moduleSize,
+          moduleSize,
+          moduleSize
+        );
+      }
+    }
+  }
+  return qr.modules.size;
+}
+
 export function createShareCardCanvas(data, documentRef = globalThis.document) {
   if (!data?.gameTitle || !data?.endingNumber || !data?.endingTitle || !data?.endingCategory
-    || !Number.isInteger(data?.survivalDays) || !data?.attributes || !data?.evaluation) {
+    || !Number.isInteger(data?.survivalDays) || !data?.attributes || !data?.evaluation
+    || !data?.gameUrl) {
     throw new TypeError("Share card data is incomplete.");
   }
   for (const key of ["survival", "social", "sanity", "chaos"]) {
@@ -94,42 +130,42 @@ export function createShareCardCanvas(data, documentRef = globalThis.document) {
 
   setFont(context, 25, 600);
   context.fillStyle = COLORS.muted;
-  context.fillText(data.gameTitle, 96, 226);
+  context.fillText(data.gameTitle, 96, 218);
   setFont(context, 22, 500, 'ui-monospace, "Cascadia Mono", "Consolas", monospace');
   context.fillStyle = COLORS.gold;
-  context.fillText(data.endingNumber, 96, 292);
+  context.fillText(data.endingNumber, 96, 276);
   setFont(context, 68, 700);
   context.fillStyle = COLORS.text;
-  const titleLines = drawWrappedText(context, data.endingTitle, 96, 388, WIDTH - 192, 82, 2);
-  let y = 388 + titleLines * 82;
+  const titleLines = drawWrappedText(context, data.endingTitle, 96, 356, WIDTH - 192, 72, 2);
+  let y = 356 + titleLines * 72;
   setFont(context, 24, 400);
   context.fillStyle = COLORS.muted;
-  const categoryLines = drawWrappedText(context, data.endingCategory, 96, y + 8, WIDTH - 192, 34, 2);
-  y += categoryLines * 34 + 30;
+  const categoryLines = drawWrappedText(context, data.endingCategory, 96, y + 6, WIDTH - 192, 30, 2);
+  y += categoryLines * 30 + 20;
 
   context.fillStyle = COLORS.panel;
-  context.fillRect(88, y, WIDTH - 176, 126);
+  context.fillRect(88, y, WIDTH - 176, 112);
   context.strokeStyle = COLORS.gold;
   context.lineWidth = 5;
   context.beginPath();
   context.moveTo(90, y + 8);
-  context.lineTo(90, y + 118);
+  context.lineTo(90, y + 104);
   context.stroke();
   setFont(context, 23, 400);
   context.fillStyle = COLORS.faint;
-  context.fillText("生存天数", 126, y + 46);
+  context.fillText("生存天数", 126, y + 42);
   setFont(context, 45, 700);
   context.fillStyle = COLORS.text;
-  context.fillText(`${data.survivalDays} / ${data.totalDays}`, 126, y + 102);
-  y += 162;
+  context.fillText(`${data.survivalDays} / ${data.totalDays}`, 126, y + 92);
+  y += 140;
 
   setFont(context, 19, 500, 'ui-monospace, "Cascadia Mono", "Consolas", monospace');
   context.fillStyle = COLORS.faint;
-  context.fillText("SURVIVAL PROFILE", 96, y + 22);
+  context.fillText("SURVIVAL PROFILE", 96, y + 18);
   setFont(context, 31, 600);
   context.fillStyle = COLORS.text;
-  context.fillText("四维属性", 96, y + 62);
-  y += 90;
+  context.fillText("四维属性", 96, y + 50);
+  y += 72;
 
   const attributeKeys = ["survival", "social", "sanity", "chaos"];
   for (const key of attributeKeys) {
@@ -143,30 +179,47 @@ export function createShareCardCanvas(data, documentRef = globalThis.document) {
     context.fillText(String(attribute.value), WIDTH - 96, y);
     context.textAlign = "left";
     context.fillStyle = COLORS.track;
-    context.fillRect(96, y + 14, WIDTH - 192, 9);
+    context.fillRect(96, y + 12, WIDTH - 192, 8);
     context.fillStyle = ATTRIBUTE_COLORS[key];
-    context.fillRect(96, y + 14, (WIDTH - 192) * Math.min(1, Math.max(0, attribute.value / 45)), 9);
-    y += 59;
+    context.fillRect(96, y + 12, (WIDTH - 192) * Math.min(1, Math.max(0, attribute.value / 45)), 8);
+    y += 50;
   }
 
-  y += 20;
+  y += 16;
   drawRule(context, y);
-  y += 39;
-  setFont(context, 23, 600);
+  y += 34;
+  setFont(context, 22, 600);
   context.fillStyle = COLORS.gold;
   context.fillText("系统评价", 96, y);
-  y += 41;
-  setFont(context, 27, 400);
+  y += 36;
+  setFont(context, 24, 400);
   context.fillStyle = COLORS.text;
-  drawWrappedText(context, data.evaluation, 96, y, WIDTH - 192, 38, 3);
+  const evaluationLines = drawWrappedText(context, data.evaluation, 96, y, 600, 34, 3);
 
-  drawRule(context, 1290);
+  const qrY = 1112;
+  drawQrCode(context, data.gameUrl, 780, qrY);
+  setFont(context, 29, 600);
+  context.fillStyle = COLORS.text;
+  context.fillText("你能活过第几天？", 96, qrY + 82);
+  setFont(context, 24, 500);
+  context.fillStyle = COLORS.muted;
+  context.fillText("扫码来试试", 96, qrY + 125);
+  setFont(context, 16, 400, 'ui-monospace, "Cascadia Mono", "Consolas", monospace');
+  context.fillStyle = COLORS.faint;
+  context.fillText("SCAN TO PLAY", 96, qrY + 158);
+  if (y + evaluationLines * 34 >= qrY - 24) {
+    throw new RangeError("Share card evaluation overlaps its QR code area.");
+  }
+
+  drawRule(context, 1360);
   setFont(context, 21, 500);
   context.fillStyle = COLORS.muted;
-  context.fillText(`${data.totalDays} 天 · ${data.totalDays} 个选择`, 96, 1340);
+  context.fillText(`${data.totalDays} 天 · ${data.totalDays} 个选择`, 96, 1400);
   setFont(context, 20, 400);
   context.fillStyle = COLORS.faint;
-  context.fillText("末日来了，你能活过第几天？", 96, 1380);
+  context.textAlign = "right";
+  context.fillText("末日来了，你能活过第几天？", WIDTH - 96, 1400);
+  context.textAlign = "left";
 
   return canvas;
 }
