@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { results } from "../src/results.js";
 import { resetRun } from "../src/game-flow.js";
 import { buildShareData, copyText, formatShareText } from "../src/share.js";
-import { createResultFilename, createShareCardCanvas } from "../src/share-card.js";
+import { canvasToPngDataUrl, createResultFilename, createShareCardCanvas } from "../src/share-card.js";
 
 function makeCanvasDocument() {
   const drawnText = [];
@@ -30,7 +30,8 @@ function makeCanvasDocument() {
   const canvas = {
     width: 0,
     height: 0,
-    getContext: () => context
+    getContext: () => context,
+    toDataURL: (type) => `data:${type};base64,share-card`
   };
   return {
     drawnText,
@@ -54,34 +55,32 @@ test("builds share data for different endings with their actual titles and categ
   assert.equal(solo.survivalDays, 12);
 });
 
-test("renders a high-resolution card with title, days, and all four attributes", () => {
+test("renders a compact high-resolution card with title, days, and all four attributes", () => {
   const data = buildShareData(results.groupAdmin, sampleScores(), 15);
   const { canvas, documentRef, drawnText } = makeCanvasDocument();
   const generated = createShareCardCanvas(data, documentRef);
   assert.equal(generated, canvas);
   assert.equal(canvas.width, 1080);
-  assert.equal(canvas.height, 1920);
+  assert.equal(canvas.height, 1440);
+  assert.equal(canvas.width / canvas.height, 0.75);
   for (const requiredText of ["末日群主", "15 / 15", "生存", "社交", "理智", "混乱", "社区协调者"]) {
     assert.ok(drawnText.some(({ text }) => text.includes(requiredText)), `expected card text: ${requiredText}`);
   }
 });
 
-test("formats copied text from the current result attributes and evaluation", () => {
+test("formats a short text report from the current result attributes", () => {
   const data = buildShareData(results.groupAdmin, sampleScores(), 15);
-  assert.equal(formatShareText(data), `《末日来了，你能活过第几天？》
+  assert.equal(formatShareText(data), `我在《末日来了，你能活过第几天？》活到了第15天，
+解锁结局「末日群主」。
 
-我的结局：末日群主
-生存天数：15 / 15
+生存 21｜社交 30｜理智 21｜混乱 0
 
-生存 21
-社交 30
-理智 21
-混乱 0
+你能活几天？`);
+});
 
-系统评价：
-请问群主，救援到了能不能发个全员通知？
-
-你也来试试。`);
+test("exports the PNG card as a data URL for image previews", () => {
+  const { canvas } = makeCanvasDocument();
+  assert.equal(canvasToPngDataUrl(canvas), "data:image/png;base64,share-card");
 });
 
 test("supports both hidden easter egg endings in share cards", () => {
@@ -94,6 +93,17 @@ test("supports both hidden easter egg endings in share cards", () => {
     assert.ok(drawnText.some(({ text }) => text.includes("15 / 15")));
   }
   assert.equal(createResultFilename("末日群主"), "apocalypse-result-末日群主.png");
+});
+
+test("fits every ending, including the longest title and evaluation, into the share card", () => {
+  for (const ending of Object.values(results)) {
+    const data = buildShareData(ending, sampleScores(), 15);
+    const { documentRef, drawnText } = makeCanvasDocument();
+    const canvas = createShareCardCanvas(data, documentRef);
+    assert.equal(canvas.height, 1440);
+    assert.ok(drawnText.some(({ text }) => text.includes(ending.title)));
+    assert.ok(drawnText.some(({ text }) => text.includes(data.evaluation)));
+  }
 });
 
 test("uses Clipboard API when available and falls back to document copy", async () => {

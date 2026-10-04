@@ -1,9 +1,10 @@
 import "./style.css";
 import { questions } from "./questions.js";
+import { results } from "./results.js";
 import { ATTRIBUTES, calculateScores, getEnding, getProgress, getSurvivalDays } from "./scoring.js";
 import { recordChoice, resetRun } from "./game-flow.js";
 import { buildShareData, copyText, formatShareText } from "./share.js";
-import { canvasToPngBlob, createResultFilename, createShareCardCanvas } from "./share-card.js";
+import { canvasToPngBlob, canvasToPngDataUrl, createResultFilename, createShareCardCanvas } from "./share-card.js";
 
 const attributeLabels = {
   survival: "生存",
@@ -14,6 +15,9 @@ const attributeLabels = {
 const app = document.querySelector("#app");
 const state = { screen: "home", current: 0, answers: Array(questions.length).fill(null), feedback: "" };
 let currentShareData;
+const resultEntries = Object.values(results);
+const hiddenEndingCount = resultEntries.filter((ending) => ending.subtitle.startsWith("隐藏彩蛋")).length;
+const standardEndingCount = resultEntries.length - hiddenEndingCount;
 
 function shell(content, extraClass = "") {
   app.innerHTML = `<main class="phone ${extraClass}">${content}</main>`;
@@ -57,7 +61,8 @@ function renderHome() {
         <div><dt>目标</dt><dd>撑过 15 天</dd></div>
       </dl>
     </section>
-    <div class="home-meta"><span><b>15</b> 天</span><span><b>08</b> 结局</span><span><b>02</b> 彩蛋</span></div>
+    <div class="home-meta"><span><b>${questions.length}</b> 天</span><span><b>${String(standardEndingCount).padStart(2, "0")}</b> 结局</span><span><b>${String(hiddenEndingCount).padStart(2, "0")}</b> 彩蛋</span></div>
+    <p class="home-share-hint">${standardEndingCount} 种结局 · ${hiddenEndingCount} 个隐藏彩蛋 · 约 2 分钟</p>
     <button class="primary-button" data-action="start">开始生存 <span>↗</span></button>
     <p class="home-footnote">离线体验 · 结果只保存在此页面</p>
   </section>`);
@@ -119,7 +124,7 @@ function renderResult() {
     <div class="system-note"><span class="note-icon">⌁</span><p><b>系统评价</b>${ending.evaluation}</p></div>
     <div class="result-actions">
       <button class="primary-button" data-action="save">生成分享卡片 <span>↗</span></button>
-      <button class="secondary-button" data-action="copy">复制结果 <span>⧉</span></button>
+      <button class="secondary-button" data-action="copy">复制文字战报 <span>⧉</span></button>
       <button class="secondary-button" data-action="restart">重新开始 <span>↻</span></button>
     </div>
     <p class="save-hint" id="share-status" role="status" aria-live="polite"></p>
@@ -136,8 +141,11 @@ async function saveResultCard() {
     const file = typeof File === "function"
       ? new File([blob], filename, { type: "image/png" })
       : null;
-    imageUrl = URL.createObjectURL(blob);
-    showSharePreview({ imageUrl, filename, file });
+    const isWeChat = /MicroMessenger/i.test(navigator.userAgent || "");
+    const imageSrc = isWeChat ? canvasToPngDataUrl(canvas) : URL.createObjectURL(blob);
+    if (!isWeChat) imageUrl = imageSrc;
+    await preloadShareImage(imageSrc);
+    showSharePreview({ imageSrc, imageUrl, filename, file });
     if (hint) hint.textContent = "分享卡片已生成";
   } catch (error) {
     if (imageUrl) URL.revokeObjectURL(imageUrl);
@@ -146,22 +154,35 @@ async function saveResultCard() {
   }
 }
 
-function showSharePreview({ imageUrl, filename, file }) {
+async function preloadShareImage(src) {
+  const image = new Image();
+  image.src = src;
+  if (typeof image.decode === "function") {
+    await image.decode();
+    return;
+  }
+  await new Promise((resolve, reject) => {
+    image.onload = resolve;
+    image.onerror = () => reject(new Error("The result card image could not be loaded."));
+  });
+}
+
+function showSharePreview({ imageSrc, imageUrl, filename, file }) {
   closeSharePreview();
   const supportsShare = Boolean(file && navigator.share);
   const isWeChat = /MicroMessenger/i.test(navigator.userAgent || "");
   const instructions = isWeChat
-    ? `<p class="share-preview-main-instruction">长按下方图片保存到手机</p><p class="share-preview-secondary-instruction">也可使用右上角 ··· 分享给朋友</p>`
+    ? `<p class="share-preview-main-instruction">可尝试长按图片保存到手机</p><p class="share-preview-secondary-instruction">不同微信版本支持情况可能不同，也可使用右上角 ··· 分享给朋友</p>`
     : `<p class="share-preview-main-instruction">长按图片保存到相册</p>`;
   const modal = document.createElement("div");
   modal.className = "share-preview";
   modal.dataset.sharePreview = "true";
   modal.innerHTML = `<section class="share-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="share-preview-title">
     <header class="share-preview-header">
-      <div><h2 id="share-preview-title">结果卡片</h2>${instructions}<small>LONG PRESS TO SAVE</small></div>
+      <div><h2 id="share-preview-title">结果卡片</h2>${instructions}<small>PNG IMAGE · 1080 × 1440</small></div>
       <button class="share-preview-close" type="button" aria-label="关闭预览">×</button>
     </header>
-    <div class="share-preview-content"><img src="${imageUrl}" alt="${currentShareData.endingTitle} · 生存结果分享卡片" /></div>
+    <div class="share-preview-content"><img src="${imageSrc}" alt="${currentShareData.endingTitle} · 生存结果分享卡片" /></div>
     <footer class="share-preview-actions">
       ${supportsShare ? `<button class="primary-button" type="button" data-preview-action="share">分享 <span>↗</span></button>` : ""}
       ${isWeChat ? "" : `<a class="secondary-button" href="${imageUrl}" download="${filename}" data-preview-action="download">下载图片 <span>↓</span></a>`}
@@ -203,18 +224,18 @@ function handleSharePreviewKeydown(event) {
 function closeSharePreview() {
   const modal = document.querySelector("[data-share-preview]");
   if (!modal) return;
-  const imageUrl = modal.querySelector("img")?.src;
   modal.remove();
   document.body.classList.remove("share-preview-open");
   document.removeEventListener("keydown", handleSharePreviewKeydown);
-  if (imageUrl) URL.revokeObjectURL(imageUrl);
+  const imageSrc = modal.querySelector("img")?.src;
+  if (imageSrc?.startsWith("blob:")) URL.revokeObjectURL(imageSrc);
 }
 
 async function copyResult() {
   const hint = app.querySelector("#share-status");
   try {
     await copyText(formatShareText(currentShareData));
-    if (hint) hint.textContent = "结果已复制";
+    if (hint) hint.textContent = "文字战报已复制";
   } catch (error) {
     console.error("Could not copy the result text.", error);
     if (hint) hint.textContent = "复制失败，请检查浏览器权限";

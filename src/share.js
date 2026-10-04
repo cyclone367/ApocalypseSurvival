@@ -42,20 +42,12 @@ export function buildShareData(ending, scores, days) {
 
 export function formatShareText(data) {
   const { attributes } = data;
-  return `《${data.gameTitle}》
+  return `我在《${data.gameTitle}》活到了第${data.survivalDays}天，
+解锁结局「${data.endingTitle}」。
 
-我的结局：${data.endingTitle}
-生存天数：${data.survivalDays} / ${data.totalDays}
+生存 ${attributes.survival.value}｜社交 ${attributes.social.value}｜理智 ${attributes.sanity.value}｜混乱 ${attributes.chaos.value}
 
-生存 ${attributes.survival.value}
-社交 ${attributes.social.value}
-理智 ${attributes.sanity.value}
-混乱 ${attributes.chaos.value}
-
-系统评价：
-${data.evaluation}
-
-你也来试试。`;
+你能活几天？`;
 }
 
 export async function copyText(text, {
